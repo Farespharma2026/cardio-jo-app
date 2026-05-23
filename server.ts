@@ -2,24 +2,8 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-// تحديد مسار المجلد الحالي بدقة ومرونة لتفادي أخطاء صيغة البناء CJS و ESM
-let resolvedFilename = '';
-try {
-  if (typeof import.meta !== 'undefined' && import.meta && import.meta.url) {
-    resolvedFilename = fileURLToPath(import.meta.url);
-  }
-} catch (e) {
-  // تراجع آمن عند تشغيل الصيغة المجمعة كـ CommonJS
-}
-
-const resolvedDirname = resolvedFilename 
-  ? path.dirname(resolvedFilename) 
-  : (typeof __dirname !== 'undefined' ? __dirname : process.cwd());
-
 const app = express();
 app.use(express.json());
 
@@ -90,8 +74,8 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// إعداد خادم التطوير مقابل خادم الإنتاج وثائقياً
-const PORT = 3000;
+// إعداد الخادم ومسار الملفات بطريقة صحيحة 100%
+const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'production') {
   import('vite').then((viteModule) => {
@@ -101,17 +85,18 @@ if (process.env.NODE_ENV !== 'production') {
     }).then((vite) => {
       app.use(vite.middlewares);
       app.listen(PORT, '0.0.0.0', () => {
-        console.log(`[Dev] Server is listening on http://localhost:${PORT}`);
+        console.log(`[Dev] Server is listening on port ${PORT}`);
       });
     });
   });
 } else {
-  // استخدام المسار المستخلص ديناميكياً لتجنب أية أخطاء مرجعية
-  app.use(express.static(path.join(resolvedDirname, 'dist')));
+  // توجيه الخادم بدقة لمجلد الواجهة الصحيح
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(resolvedDirname, 'dist', 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   });
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Prod] Server is listening on http://localhost:${PORT}`);
+  app.listen(PORT as number, '0.0.0.0', () => {
+    console.log(`[Prod] Server is listening on port ${PORT}`);
   });
 }
