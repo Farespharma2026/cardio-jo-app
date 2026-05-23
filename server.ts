@@ -6,20 +6,31 @@ import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// تحديد مسار المجلد الحالي بدقة ومرونة لتفادي أخطاء صيغة البناء CJS و ESM
+let resolvedFilename = '';
+try {
+  if (typeof import.meta !== 'undefined' && import.meta && import.meta.url) {
+    resolvedFilename = fileURLToPath(import.meta.url);
+  }
+} catch (e) {
+  // تراجع آمن عند تشغيل الصيغة المجمعة كـ CommonJS
+}
+
+const resolvedDirname = resolvedFilename 
+  ? path.dirname(resolvedFilename) 
+  : (typeof __dirname !== 'undefined' ? __dirname : process.cwd());
 
 const app = express();
 app.use(express.json());
 
-// Initialize Gemini SDK with server-side API Key
+// تشغيل مفتاح واجهة برمجة تطبيقات Gemini
 const apiKey = process.env.GEMINI_API_KEY;
 
 app.post('/api/analyze', async (req, res) => {
   try {
     if (!apiKey) {
       return res.status(500).json({
-        error: 'مفتاح API الخاص بـ Gemini غير مهيأ. يرجى تهيئته في Settings > Secrets في AI Studio.'
+        error: 'مفتاح API الخاص بـ Gemini غير مهيأ. يرجى تهيئته في الإعدادات البيئية للمشروع.'
       });
     }
 
@@ -34,8 +45,6 @@ app.post('/api/analyze', async (req, res) => {
       }
     });
 
-    // We can use the recommended models, 'gemini-3.5-flash' for basic tasks or Q&A.
-    // Let's use gemini-3.5-flash which is excellent, performant, and has no extra fees.
     const prompt = `
 أنت مساعد طبي استشاري ذكي وخبير في الصيدلة السريرية وتحليل الخطط العلاجية وتحديد التفاعلات الدوائية (Clinical Decision Support System).
 قم بتحليل بيانات المريض السريرية التالية تحليلاً متعمقاً ودقيقاً:
@@ -70,7 +79,7 @@ app.post('/api/analyze', async (req, res) => {
       model: 'gemini-3.5-flash',
       contents: prompt,
       config: {
-        temperature: 0.2, // lower temperature for medical precision and factual consistency
+        temperature: 0.2,
       }
     });
 
@@ -81,11 +90,10 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Setup dev server vs production static serving
+// إعداد خادم التطوير مقابل خادم الإنتاج وثائقياً
 const PORT = 3000;
 
 if (process.env.NODE_ENV !== 'production') {
-  // We'll dynamic import Vite in dev so production load is fast and doesn't load compiler deps
   import('vite').then((viteModule) => {
     viteModule.createServer({
       server: { middlewareMode: true },
@@ -98,10 +106,10 @@ if (process.env.NODE_ENV !== 'production') {
     });
   });
 } else {
-  // Serve production build static files
-  app.use(express.static(path.join(__dirname, 'dist')));
+  // استخدام المسار المستخلص ديناميكياً لتجنب أية أخطاء مرجعية
+  app.use(express.static(path.join(resolvedDirname, 'dist')));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    res.sendFile(path.join(resolvedDirname, 'dist', 'index.html'));
   });
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Prod] Server is listening on http://localhost:${PORT}`);
