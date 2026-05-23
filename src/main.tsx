@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import App from './App'; import './index.css';
 
 // هذه القطعة البرمجية ستلتقط أي خطأ مخفي وتعرضه على الشاشة فوراً
 class ErrorBoundary extends React.Component {
